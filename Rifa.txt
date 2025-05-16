@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Site de Rifa Simples</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 10px;
+    background: #f8f8f8;
+    color: #333;
+  }
+  h1, h2 {
+    text-align: center;
+  }
+  .rifa-info, .compra, .resultado {
+    background: white;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 8px;
+    box-shadow: 0 0 8px #ccc;
+  }
+  label {
+    display: block;
+    margin-top: 8px;
+  }
+  input[type="text"], input[type="email"], input[type="number"] {
+    width: 100%;
+    padding: 6px;
+    margin-top: 4px;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 15px;
+    padding: 10px 15px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .numeros {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .numero {
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    margin: 5px;
+    background: #eee;
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.3s;
+  }
+  .numero.vendido {
+    background: #f44336;
+    color: white;
+    cursor: default;
+  }
+  .numero.selecionado {
+    background: #4caf50;
+    color: white;
+  }
+  .info-venda {
+    margin-top: 10px;
+    font-weight: bold;
+  }
+  .vencedor {
+    font-size: 24px;
+    text-align: center;
+    color: #007bff;
+  }
+</style>
+</head>
+<body>
+
+<h1>Rifa Simples</h1>
+
+<div class="rifa-info">
+  <h2>Configurar Rifa</h2>
+  <label>Nome da Rifa:
+    <input type="text" id="nomeRifa" placeholder="Ex: Sorteio de Bike" />
+  </label>
+  <label>Descrição:
+    <input type="text" id="descRifa" placeholder="Ex: Uma bicicleta nova para você!" />
+  </label>
+  <label>Quantidade de Números:
+    <input type="number" id="quantNumeros" min="1" max="200" value="50" />
+  </label>
+  <label>Preço por Número (R$):
+    <input type="number" id="precoNumero" min="0" step="0.01" value="10" />
+  </label>
+  <button id="btnCriarRifa">Criar Rifa</button>
+</div>
+
+<div class="compra" style="display:none;">
+  <h2>Compre seus números</h2>
+  <div class="numeros" id="listaNumeros"></div>
+
+  <label>Seu Nome:
+    <input type="text" id="nomeComprador" placeholder="Seu nome" />
+  </label>
+  <label>Seu Email:
+    <input type="email" id="emailComprador" placeholder="seu@email.com" />
+  </label>
+  <button id="btnComprar" disabled>Comprar números selecionados</button>
+  <div class="info-venda" id="infoVenda"></div>
+</div>
+
+<div class="resultado" style="display:none;">
+  <h2>Resultado do Sorteio</h2>
+  <button id="btnSortear">Sortear vencedor</button>
+  <div class="vencedor" id="vencedor"></div>
+</div>
+
+<script>
+  const btnCriarRifa = document.getElementById('btnCriarRifa');
+  const compraDiv = document.querySelector('.compra');
+  const resultadoDiv = document.querySelector('.resultado');
+  const listaNumerosDiv = document.getElementById('listaNumeros');
+  const btnComprar = document.getElementById('btnComprar');
+  const infoVenda = document.getElementById('infoVenda');
+  const vencedorDiv = document.getElementById('vencedor');
+  const btnSortear = document.getElementById('btnSortear');
+
+  let rifa = null;
+  let numerosSelecionados = [];
+
+  btnCriarRifa.addEventListener('click', () => {
+    const nome = document.getElementById('nomeRifa').value.trim();
+    const desc = document.getElementById('descRifa').value.trim();
+    const quantidade = parseInt(document.getElementById('quantNumeros').value);
+    const preco = parseFloat(document.getElementById('precoNumero').value);
+
+    if (!nome || quantidade < 1 || isNaN(preco) || preco < 0) {
+      alert('Preencha corretamente todos os campos para criar a rifa.');
+      return;
+    }
+
+    rifa = {
+      nome,
+      descricao: desc,
+      quantidade,
+      preco,
+      numeros: [], // [{num: 1, vendido: false, comprador: null}]
+      vendas: [], // registros das vendas
+    };
+
+    for (let i = 1; i <= quantidade; i++) {
+      rifa.numeros.push({num: i, vendido: false, comprador: null});
+    }
+
+    numerosSelecionados = [];
+    infoVenda.textContent = '';
+    vencedorDiv.textContent = '';
+
+    renderNumeros();
+    compraDiv.style.display = 'block';
+    resultadoDiv.style.display = 'block';
+  });
+
+  function renderNumeros() {
+    listaNumerosDiv.innerHTML = '';
+    rifa.numeros.forEach(n => {
+      const div = document.createElement('div');
+      div.className = 'numero';
+      if (n.vendido) {
+        div.classList.add('vendido');
+      }
+      if (numerosSelecionados.includes(n.num)) {
+        div.classList.add('selecionado');
+      }
+      div.textContent = n.num;
+      if (!n.vendido) {
+        div.addEventListener('click', () => toggleSelecionarNumero(n.num));
+      }
+      listaNumerosDiv.appendChild(div);
+    });
+    updateBtnComprar();
+  }
+
+  function toggleSelecionarNumero(num) {
+    if (numerosSelecionados.includes(num)) {
+      numerosSelecionados = numerosSelecionados.filter(n => n !== num);
+    } else {
+      numerosSelecionados.push(num);
+    }
+    renderNumeros();
+  }
+
+  function updateBtnComprar() {
+    btnComprar.disabled = numerosSelecionados.length === 0;
+  }
+
+  btnComprar.addEventListener('click', () => {
+    const nomeComprador = document.getElementById('nomeComprador').value.trim();
+    const emailComprador = document.getElementById('emailComprador').value.trim();
+
+    if (!nomeComprador || !validateEmail(emailComprador)) {
+      alert('Por favor, informe um nome e um email válido.');
+      return;
+    }
+
+    numerosSelecionados.forEach(num => {
+      const item = rifa.numeros.find(n => n.num === num);
+      item.vendido = true;
+      item.comprador = {nome: nomeComprador, email: emailComprador};
+      rifa.vendas.push({num, nome: nomeComprador, email: emailComprador});
+    });
+
+    const total = (numerosSelecionados.length * rifa.preco).toFixed(2);
+    infoVenda.textContent = `Compra realizada! Você comprou ${numerosSelecionados.length} número(s) por R$${total}. Obrigado, ${nomeComprador}!`;
+
+    numerosSelecionados = [];
+    renderNumeros();
+    btnComprar.disabled = true;
+
+    // Limpa formulário comprador
+    document.getElementById('nomeComprador').value = '';
+    document.getElementById('emailComprador').value = '';
+  });
+
+  btnSortear.addEventListener('click', () => {
+    if (rifa.vendas.length === 0) {
+      alert('Nenhuma venda realizada ainda para sortear.');
+      return;
+    }
+    const vencedorIndex = Math.floor(Math.random() * rifa.vendas.length);
+    const vencedor = rifa.vendas[vencedorIndex];
+    vencedorDiv.textContent = `Vencedor: ${vencedor.nome} (Número(s): ${vencedor.num}) - Email: ${vencedor.email}`;
+  });
+
+  function validateEmail(email) {
+    // Validação simples
+    const re = /\S+@\S+\.\S+/;
+    return re.test(email);
+  }
+</script>
+
+</body>
+</html>
